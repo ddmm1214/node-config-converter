@@ -41,7 +41,20 @@ def build_exe():
     # 执行打包命令
     print("开始构建 EXE 文件...")
     print("命令:", " ".join(cmd))
-    subprocess.call(cmd)
+    
+    # 在GitHub Actions中使用UTF-8编码
+    import locale
+    if os.getenv('GITHUB_ACTIONS'):
+        # GitHub Actions环境
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8')
+        if result.returncode != 0:
+            print("构建失败:")
+            print(result.stderr)
+            sys.exit(1)
+    else:
+        # 本地环境
+        subprocess.call(cmd)
+        
     print("构建完成！")
     print("EXE 文件已生成在 dist 目录下")
 

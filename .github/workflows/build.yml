@@ -26,12 +26,15 @@ jobs:
         pip install pyinstaller
         
     - name: 构建exe文件
+      id: build
       run: |
-        python build_exe.py
+        # 设置UTF-8编码环境
+        chcp 65001
+        $env:PYTHONIOENCODING = "utf-8"
+        $env:PYTHONUTF8 = "1"
         
-    - name: 获取版本号
-      id: get_version
-      run: |
+        # 使用PyInstaller直接构建，避免中文路径问题
+        # 获取版本号
         if ("$env:GITHUB_REF" -match "refs/tags/(.*)") {
           $version = $matches[1]
         } else {
@@ -39,6 +42,22 @@ jobs:
         }
         echo "version=$version" >> $env:GITHUB_OUTPUT
         echo "构建版本: $version"
+        
+        # 构建exe
+        pyinstaller --name="NodeConfigConverter" --windowed --onefile --clean --distpath=dist --workpath=build yaml_to_v2rayn.py
+      shell: powershell
+      
+    - name: 验证构建结果
+      run: |
+        if (Test-Path "./dist/NodeConfigConverter.exe") {
+          $size = (Get-Item "./dist/NodeConfigConverter.exe").Length
+          Write-Output "✅ exe文件构建成功，大小: $([math]::Round($size/1MB, 2)) MB"
+          # 重命名为更友好的中文名
+          Copy-Item "./dist/NodeConfigConverter.exe" "./dist/节点转换工具-${{ steps.build.outputs.version }}.exe"
+        } else {
+          Write-Error "❌ exe文件构建失败"
+          exit 1
+        }
       shell: powershell
       
     - name: 创建Release
@@ -46,9 +65,9 @@ jobs:
       uses: softprops/action-gh-release@v1
       if: startsWith(github.ref, 'refs/tags/')
       with:
-        name: 节点配置转换工具 ${{ steps.get_version.outputs.version }}
+        name: 节点配置转换工具 ${{ steps.build.outputs.version }}
         body: |
-          ## 🚀 节点配置转换工具 ${{ steps.get_version.outputs.version }}
+          ## 🚀 节点配置转换工具 ${{ steps.build.outputs.version }}
           
           ### ✨ 主要功能
           - 🔄 **三向转换**：Clash YAML ⇄ V2rayN 链接 + V2Ray Config.json
@@ -57,7 +76,7 @@ jobs:
           - 🛡️ **协议支持**：VMess, VLESS, SS, Trojan, Hysteria2
           
           ### 📦 使用说明
-          1. 下载并运行 `节点转换工具-${{ steps.get_version.outputs.version }}.exe`
+          1. 下载并运行 `NodeConfigConverter.exe`
           2. 选择转换方向
           3. 粘贴配置内容
           4. 点击转换并复制结果
@@ -73,7 +92,8 @@ jobs:
           ---
           📝 详细更新日志请查看 [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)
         files: |
-          ./dist/节点转换工具-v2.1.exe
+          ./dist/NodeConfigConverter.exe
+          ./dist/节点转换工具-${{ steps.build.outputs.version }}.exe
         draft: false
         prerelease: false
         generate_release_notes: true
