@@ -1,22 +1,23 @@
-name: Build and Release
+name: 最终发布
 
 on:
   push:
     tags:
-      - 'v*.*.*'  # 触发条件：推送版本标签 (如 v2.1.0)
-  workflow_dispatch:  # 手动触发
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
-  build-windows:
+  build-and-release:
     runs-on: windows-latest
-    outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
     
     steps:
-    - name: Checkout code
+    - name: Checkout
       uses: actions/checkout@v4
       
-    - name: Set up Python
+    - name: Setup Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
@@ -29,146 +30,42 @@ jobs:
         
     - name: Build executable
       run: |
-        python build_exe.py
+        pyinstaller --name=node-converter --onefile --clean yaml_to_v2rayn.py
         
-    - name: Get version from tag
-      id: get_version
+    - name: Verify build
       run: |
-        if ($env:GITHUB_REF -match "refs/tags/(.*)") {
-          $version = $matches[1]
+        if (Test-Path "dist/node-converter.exe") {
+          Write-Host "Build successful!"
+          Get-ChildItem dist/
         } else {
-          $version = "latest"
+          Write-Host "Build failed!"
+          exit 1
         }
-        echo "version=$version" >> $env:GITHUB_OUTPUT
-        echo "Version: $version"
       shell: powershell
-      
+        
     - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: softprops/action-gh-release@v1
       with:
-        tag_name: ${{ steps.get_version.outputs.version }}
-        release_name: 节点配置转换工具 ${{ steps.get_version.outputs.version }}
+        name: 节点转换工具 ${{ github.ref_name }}
         body: |
-          ## 🚀 节点配置转换工具 ${{ steps.get_version.outputs.version }}
+          ## 🚀 节点转换工具 ${{ github.ref_name }}
           
-          ### ✨ 功能特色
-          - **三向转换支持**：Clash YAML ⇄ V2rayN 链接 + V2Ray Config.json
-          - **现代化GUI界面**：三种转换模式颜色区分
-          - **智能格式检测**：自动识别输入内容类型
-          - **协议支持**：VMess、VLESS、SS、Trojan、Hysteria2
+          ### ✨ 功能特性
+          - 🔄 双向转换：Clash YAML ⇄ V2rayN 链接
+          - 📄 V2Ray config.json 生成
+          - 🎨 现代化GUI界面
+          - 🛡️ 支持协议：VMess, VLESS, SS, Trojan, Hysteria2
           
-          ### 📦 下载说明
-          - **Windows用户**：下载 `节点转换工具-${{ steps.get_version.outputs.version }}.exe`
-          - **其他平台**：下载源码，使用 `python yaml_to_v2rayn.py` 运行
+          ### 📥 使用方法
+          1. 下载 `node-converter.exe`
+          2. 双击运行（Windows系统）
+          3. 选择转换方向并使用
           
-          ### 🔧 使用方法
-          1. 双击运行exe文件（Windows）
-          2. 选择转换方向（三种模式）
-          3. 粘贴配置内容
-          4. 点击转换并复制结果
-          
-          ### ⚠️ 注意事项
-          - 本工具仅供学习和研究使用
-          - 请确保您有合法权限使用相关网络服务
-          
-          ---
-          **完整更新日志请查看 [CHANGELOG.md](CHANGELOG.md)**
+          ⚠️ 仅供学习研究使用
+        files: |
+          dist/node-converter.exe
         draft: false
         prerelease: false
-        
-    - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
+        fail_on_unmatched_files: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./dist/节点转换工具-v2.1.exe
-        asset_name: 节点转换工具-${{ steps.get_version.outputs.version }}.exe
-        asset_content_type: application/octet-stream
-        
-  build-linux:
-    runs-on: ubuntu-latest
-    needs: build-windows
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-        
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pyinstaller
-        
-    - name: Build executable (Linux)
-      run: |
-        pyinstaller --name="node-config-converter" --onefile --clean yaml_to_v2rayn.py
-        
-    - name: Get version from tag
-      id: get_version
-      run: |
-        if [[ $GITHUB_REF == refs/tags/* ]]; then
-          echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-        else
-          echo "version=latest" >> $GITHUB_OUTPUT
-        fi
-        
-    - name: Upload Linux Binary
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ needs.build-windows.outputs.upload_url }}
-        asset_path: ./dist/node-config-converter
-        asset_name: node-config-converter-linux-${{ steps.get_version.outputs.version }}
-        asset_content_type: application/octet-stream
-        
-  build-macos:
-    runs-on: macos-latest
-    needs: build-windows
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-        
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pyinstaller
-        
-    - name: Build executable (macOS)
-      run: |
-        pyinstaller --name="node-config-converter" --onefile --clean yaml_to_v2rayn.py
-        
-    - name: Get version from tag
-      id: get_version
-      run: |
-        if [[ $GITHUB_REF == refs/tags/* ]]; then
-          echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-        else
-          echo "version=latest" >> $GITHUB_OUTPUT
-        fi
-        
-    - name: Upload macOS Binary
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ needs.build-windows.outputs.upload_url }}
-        asset_path: ./dist/node-config-converter
-        asset_name: node-config-converter-macos-${{ steps.get_version.outputs.version }}
-        asset_content_type: application/octet-stream
