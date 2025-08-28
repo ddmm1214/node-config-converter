@@ -36,10 +36,10 @@ jobs:
           $size = (Get-Item "dist/node-converter.exe").Length / 1MB
           Write-Host "✅ Build successful! Size: $([math]::Round($size, 1)) MB"
           Write-Host "File location: $(Get-Location)\dist\node-converter.exe"
-          ls dist\ -la
+          Get-ChildItem dist\
         } else {
           Write-Host "❌ Build failed - exe not found"
-          ls dist\ -la
+          Get-ChildItem dist\ -ErrorAction SilentlyContinue
           exit 1
         }
       shell: powershell
