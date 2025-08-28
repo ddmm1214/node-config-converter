@@ -1,0 +1,85 @@
+name: 代码检查和测试
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.9', '3.10', '3.11']
+    
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+      
+    - name: 设置Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        
+    - name: 安装依赖
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install flake8 pytest
+        
+    - name: 代码风格检查
+      run: |
+        # 停止构建如果有Python语法错误或未定义的名称
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # 退出时将任何警告视为错误，但忽略E501行长度
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics --ignore=E501
+        
+    - name: 检查代码可运行性
+      run: |
+        python -c "import yaml_to_v2rayn; print('模块导入成功')"
+        
+    - name: 基础功能测试
+      run: |
+        python -c "
+        from yaml_to_v2rayn import V2rayToClash, V2rayConfigGenerator
+        print('反向转换器创建成功')
+        v2ray_converter = V2rayToClash()
+        config_generator = V2rayConfigGenerator()
+        print('所有核心类创建成功')
+        "
+        
+  build-test:
+    runs-on: windows-latest
+    needs: test
+    
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+      
+    - name: 设置Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: 安装依赖
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+        
+    - name: 测试构建exe
+      run: |
+        python build_exe.py
+        
+    - name: 验证exe文件
+      run: |
+        if (Test-Path "./dist/节点转换工具-v2.1.exe") {
+          $size = (Get-Item "./dist/节点转换工具-v2.1.exe").Length
+          Write-Output "✅ exe文件构建成功，大小: $([math]::Round($size/1MB, 2)) MB"
+        } else {
+          Write-Error "❌ exe文件构建失败"
+          exit 1
+        }
+      shell: powershell

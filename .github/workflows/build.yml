@@ -1,0 +1,81 @@
+name: Build and Release (简化版)
+
+on:
+  push:
+    tags:
+      - 'v*'  # 当推送版本标签时触发 (如 v2.1.0)
+  workflow_dispatch:  # 手动触发
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+      
+    - name: 设置Python环境
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: 安装依赖
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+        
+    - name: 构建exe文件
+      run: |
+        python build_exe.py
+        
+    - name: 获取版本号
+      id: get_version
+      run: |
+        if ("$env:GITHUB_REF" -match "refs/tags/(.*)") {
+          $version = $matches[1]
+        } else {
+          $version = "dev-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+        }
+        echo "version=$version" >> $env:GITHUB_OUTPUT
+        echo "构建版本: $version"
+      shell: powershell
+      
+    - name: 创建Release
+      id: create_release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        name: 节点配置转换工具 ${{ steps.get_version.outputs.version }}
+        body: |
+          ## 🚀 节点配置转换工具 ${{ steps.get_version.outputs.version }}
+          
+          ### ✨ 主要功能
+          - 🔄 **三向转换**：Clash YAML ⇄ V2rayN 链接 + V2Ray Config.json
+          - 🎨 **现代化界面**：三种转换模式颜色区分（绿/蓝/橙）
+          - 🧠 **智能检测**：自动识别输入格式
+          - 🛡️ **协议支持**：VMess, VLESS, SS, Trojan, Hysteria2
+          
+          ### 📦 使用说明
+          1. 下载并运行 `节点转换工具-${{ steps.get_version.outputs.version }}.exe`
+          2. 选择转换方向
+          3. 粘贴配置内容
+          4. 点击转换并复制结果
+          
+          ### 🔧 技术特性
+          - 支持多种SS链接编码格式
+          - Reality加密支持
+          - WebSocket传输协议
+          - 智能路由规则生成
+          
+          ⚠️ **免责声明**：本工具仅供学习研究使用，请遵守相关法律法规。
+          
+          ---
+          📝 详细更新日志请查看 [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)
+        files: |
+          ./dist/节点转换工具-v2.1.exe
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

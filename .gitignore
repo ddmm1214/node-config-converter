@@ -124,3 +124,14 @@ temp_config.yaml
 test_*.py
 .idea/
 .vscode/
+
+# GitHub Actions
+.github/workflows/*.log
+
+# Release artifacts (keep in repo for Actions)
+# dist/ - commented out to allow GitHub Actions to access built files
+
+# Local development
+node_modules/
+*.log
+.DS_Store
